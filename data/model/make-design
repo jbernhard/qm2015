@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+
+"""
+Modified version of the same script in heavy-ion-collisions-osg.  Writes an
+HDF5 file instead of input files for the model.
+
+Must have R with package 'lhs'.
+"""
+
+import subprocess
+import sys
+
+import numpy as np
+import h5py
+
+
+#     label                    min    max  guess
+design_params = [
+    (r'norm',                100.0, 250.0, 180.0),
+    (r'$p$',                  -1.0,   1.0,   0.0),
+    (r'$k$',                   0.8,   2.2,   1.4),
+    (r'$w$',                   0.4,   1.0,   0.6),
+    (r'$\eta/s$ hrg',          0.3,   1.0,   0.5),
+    (r'$\eta/s$ min',          0.0,   0.3,   0.1),
+    (r'$\eta/s$ slope',        0.0,   2.0,   1.0),
+    (r'$\zeta/s$ norm',        0.0,   2.0,   0.5),
+    (r'$T_\mathrm{switch}$',   0.135, 0.165, 0.150),
+]
+
+
+def generate_lhs(npoints, ndim, seed=np.random.randint(2**30)):
+    """
+    Call R to generate a maximin LHS.
+
+    """
+    output = subprocess.check_output(
+        ['R', '--slave'],
+        input="""
+        library('lhs')
+        set.seed({})
+        write.table(maximinLHS({}, {}), col.names=FALSE, row.names=FALSE)
+        """.format(seed, npoints, ndim).encode(),
+    )
+
+    return np.array([l.split() for l in output.splitlines()], dtype=float)
+
+
+def main():
+    try:
+        output_file = sys.argv[1]
+    except IndexError:
+        output_file = 'design.hdf'
+
+    lhs = generate_lhs(300, len(design_params), seed=716535127)
+
+    zip_params = zip(*design_params)
+    labels = list(next(zip_params))
+    low, high, guess = map(np.array, zip_params)
+
+    # rescale the hypercube to the design range
+    design = lhs*(high - low) + low
+
+    # sort by normalized distance from the guess point
+    # this way better points will in general run earlier
+    order = np.square((design - guess) / (high - low)).sum(axis=1).argsort()
+    design = design[order]
+
+    with h5py.File(output_file, 'w-') as f:
+        f.create_dataset('design', data=design)
+        f.create_dataset('range', data=np.column_stack([low, high]))
+        d = f.create_dataset('parameters', shape=(len(labels),),
+                             dtype=h5py.special_dtype(vlen=str))
+        d[:] = labels
+
+
+if __name__ == "__main__":
+    main()
