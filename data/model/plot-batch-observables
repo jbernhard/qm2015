@@ -1,22 +1,13 @@
 #!/usr/bin/env python3
 
 import argparse
+import itertools
 
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
-
-
-model_kwargs = dict(lw=0.6, alpha=0.3)
-exp_kwargs = dict(fmt='o', ms=4.5, lw=1.3, capsize=0, color='0.4', zorder=1000)
-
-id_part_symbols = dict(
-    pion=r'\pi^\pm',
-    kaon=r'K^\pm',
-    proton=r'p\bar p',
-)
 
 
 def load_dsets(group, *keys):
@@ -36,101 +27,62 @@ def main():
 
     args = parser.parse_args()
 
+    sns.set(palette='Blues_d', font_scale=1.2)
+
+    id_parts = [
+        ('pion',   r'\pi^\pm'),
+        ('kaon',   r'K^\pm'),
+        ('proton', r'p\bar p'),
+    ]
+
+    basic_plots = itertools.chain(
+        [('dNch_deta', r'$dN_\mathrm{ch}/d\eta$')],
+        [('dN_dy/{}'.format(name), r'${}\;dN/dy$'.format(symbol))
+         for name, symbol in id_parts],
+        [('mean_pT/{}'.format(name),
+          r'${}\;\langle p_T \rangle$'.format(symbol))
+         for name, symbol in id_parts],
+        [('vn/{}'.format(n), '$v_' + str(n) + '\{2\}$')
+         for n in [2, 3]],
+        [('v3/v2 ratio', '$v_3 / v_2$')]
+    )
+
     with \
             h5py.File(args.batch_observables_file, 'r') as model, \
             h5py.File(args.exp_data_file) as exp, \
             PdfPages(args.plot_file) as pdf:
+        for key, title in basic_plots:
+            print(key)
 
-        colors = sns.husl_palette(model['batches'].size, s=0.8, l=0.5)
+            if key == 'v3/v2 ratio':
+                xmodel, v2 = load_dsets(model['vn/2'], 'x', 'Y')
+                v3 = np.array(model['vn/3/Y'])
+                Y = v3/v2
+                xexp, v3 = load_dsets(exp['vn/3'], 'x', 'y')
+                v2 = np.array(exp['vn/2/y'])[:v3.size]
+                y = v3/v2
+                yerr = None
+            else:
+                xmodel, Y = load_dsets(model[key], 'x', 'Y')
+                xexp, y, yerr = load_dsets(exp[key], 'x', 'y', 'yerr')
 
-        print('dNch/deta')
-        plt.yscale('log')
+            for i in Y:
+                plt.plot(xmodel, i, lw=0.6, alpha=0.3)
 
-        x, Y = load_dsets(model['dNch_deta'], 'x', 'Y')
-        for zorder, (y, color) in enumerate(zip(Y, colors), start=100):
-            plt.plot(x, y, color=color, zorder=zorder, **model_kwargs)
+            plt.errorbar(xexp, y, yerr=yerr, fmt='o', ms=5, lw=1.5, capsize=0,
+                         color='0.4', zorder=1000)
 
-        x, y, yerr = load_dsets(exp['dNch_deta'], 'x', 'y', 'yerr')
-        plt.errorbar(x, y, yerr=yerr, **exp_kwargs)
-
-        plt.xlabel('Centrality %')
-        plt.ylabel(r'$dN_\mathrm{ch}/d\eta$')
-
-        plt.tight_layout(pad=0)
-        pdf.savefig()
-        plt.close()
-
-        print('dN/dy')
-        for name, group in model['dN_dy'].items():
-            plt.yscale('log')
-
-            x, Y = load_dsets(group, 'x', 'Y')
-            for zorder, (y, color) in enumerate(zip(Y, colors), start=100):
-                plt.plot(x, y, color=color, zorder=zorder, **model_kwargs)
-
-            x, y, yerr = load_dsets(exp['dN_dy'][name], 'x', 'y', 'yerr')
-            plt.errorbar(x, y, yerr=yerr, **exp_kwargs)
+            if key.startswith('dN'):
+                plt.yscale('log')
+            elif key.startswith('vn'):
+                plt.ylim(ymin=0)
 
             plt.xlabel('Centrality %')
-            plt.ylabel(r'${}\;dN/dy$'.format(id_part_symbols[name]))
+            plt.title(title)
 
             plt.tight_layout(pad=0)
             pdf.savefig()
             plt.close()
-
-        print('mean pT')
-        for name, group in model['mean_pT'].items():
-            x, Y = load_dsets(group, 'x', 'Y')
-            for zorder, (y, color) in enumerate(zip(Y, colors), start=100):
-                plt.plot(x, y, color=color, zorder=zorder, **model_kwargs)
-
-            x, y, yerr = load_dsets(exp['mean_pT'][name], 'x', 'y', 'yerr')
-            plt.errorbar(x, y, yerr=yerr, **exp_kwargs)
-
-            plt.xlabel('Centrality %')
-            plt.ylabel(r'${}\;\langle p_T \rangle$'
-                       .format(id_part_symbols[name]))
-
-            plt.tight_layout(pad=0)
-            pdf.savefig()
-            plt.close()
-
-        print('vn')
-        for name, group in model['vn'].items():
-            x, Y = load_dsets(group, 'x', 'Y')
-            for zorder, (y, color) in enumerate(zip(Y, colors), start=100):
-                plt.plot(x, y, color=color, zorder=zorder, **model_kwargs)
-
-            x, y, yerr = load_dsets(exp['vn'][name], 'x', 'y', 'yerr')
-            plt.errorbar(x, y, yerr=yerr, **exp_kwargs)
-
-            plt.ylim(ymin=0)
-
-            plt.xlabel('Centrality %')
-            plt.ylabel('$v_' + name + '\{2\}$')
-
-            plt.tight_layout(pad=0)
-            pdf.savefig()
-            plt.close()
-
-        print('v3/v2 ratio')
-        x, v2 = load_dsets(model['vn/2'], 'x', 'Y')
-        v3 = np.array(model['vn/3/Y'])
-
-        for zorder, (y, color) in enumerate(zip(v3/v2, colors), start=100):
-            plt.plot(x, y, color=color, zorder=zorder, **model_kwargs)
-
-        x, v3 = load_dsets(exp['vn/3'], 'x', 'y')
-        v2 = np.array(exp['vn/2/y'])[:v3.size]
-
-        plt.errorbar(x, v3/v2, **exp_kwargs)
-
-        plt.xlabel('Centrality %')
-        plt.ylabel('$v_3 / v_2$')
-
-        plt.tight_layout(pad=0)
-        pdf.savefig()
-        plt.close()
 
 
 if __name__ == "__main__":
