@@ -21,6 +21,8 @@ def main():
 
     parser.add_argument('batch_observables_file',
                         help='HDF5 batch observables file')
+    parser.add_argument('design_file',
+                        help='HDF5 design file')
     parser.add_argument('exp_data_file',
                         help='HDF5 experimental data file')
     parser.add_argument('plot_file', help='output pdf file')
@@ -35,22 +37,24 @@ def main():
         ('proton', r'p\bar p'),
     ]
 
-    basic_plots = itertools.chain(
-        [('dNch_deta', r'$dN_\mathrm{ch}/d\eta$')],
-        [('dN_dy/{}'.format(name), r'${}\;dN/dy$'.format(symbol))
-         for name, symbol in id_parts],
-        [('mean_pT/{}'.format(name),
-          r'${}\;\langle p_T \rangle$'.format(symbol))
-         for name, symbol in id_parts],
-        [('vn/{}'.format(n), '$v_' + str(n) + '\{2\}$')
-         for n in [2, 3]],
-        [('v3/v2 ratio', '$v_3 / v_2$')]
-    )
-
     with \
             h5py.File(args.batch_observables_file, 'r') as model, \
-            h5py.File(args.exp_data_file) as exp, \
+            h5py.File(args.design_file, 'r') as design, \
+            h5py.File(args.exp_data_file, 'r') as exp, \
             PdfPages(args.plot_file) as pdf:
+
+        basic_plots = itertools.chain(
+            [('dNch_deta', r'$dN_\mathrm{ch}/d\eta$')],
+            [('dN_dy/{}'.format(name), r'${}\;dN/dy$'.format(symbol))
+             for name, symbol in id_parts],
+            [('mean_pT/{}'.format(name),
+              r'${}\;\langle p_T \rangle$'.format(symbol))
+             for name, symbol in id_parts],
+            [('vn/{}'.format(n), '$v_' + str(n) + '\{2\}$')
+             for n in [2, 3]],
+            [('v3/v2 ratio', '$v_3 / v_2$')]
+        )
+
         for key, title in basic_plots:
             print(key)
 
@@ -83,6 +87,81 @@ def main():
             plt.tight_layout(pad=0)
             pdf.savefig()
             plt.close()
+
+        def compute_nll(key):
+            Y = model[key]['Y']
+            y = exp[key]['y']
+            ncols = min(Y.shape[1], y.size)
+            Y = Y[:, :ncols]
+            y = y[:ncols]
+            return np.square((Y - y)/y).sum(axis=1)
+
+        nll_obs = [
+            ('dN_dy',   r'$dN/dy$',               [i[0] for i in id_parts]),
+            ('mean_pT', r'$\langle p_T \rangle$', [i[0] for i in id_parts]),
+            ('vn',      r'$v_n\{2\}$',            ['2', '3']),
+        ]
+
+        nll = sum(compute_nll('{}/{}'.format(a, c))
+                  for a, _, b in nll_obs for c in b)
+        best = nll.argsort()[:5]
+
+        print('best points')
+        fig, axes = plt.subplots(ncols=len(nll_obs),
+                                 figsize=(5*len(nll_obs), 4))
+
+        for (key, title, subkeys), ax in zip(nll_obs, axes):
+            if key == 'vn':
+                palettes = ['Purples_d', 'Oranges_d']
+            else:
+                palettes = ['Blues_d', 'Greens_d', 'Reds_d']
+
+            for subkey, palette in zip(subkeys, palettes):
+                x = np.array(model[key][subkey]['x'])
+                palette = sns.color_palette(palette, best.size)
+
+                for i, color in zip(best, palette):
+                    ax.plot(x, model[key][subkey]['Y'][i], color=color, lw=0.8)
+
+                x, y, yerr = load_dsets(exp[key][subkey], 'x', 'y', 'yerr')
+                ax.errorbar(x, y, yerr=yerr, fmt='o', ms=5, lw=1.5, capsize=0,
+                            color='0.4', zorder=1000)
+
+            ax.set_xlabel('Centrality %')
+            ax.set_title(title)
+
+            if key == 'dN_dy':
+                ax.set_yscale('log')
+            else:
+                ax.set_ylim(ymin=0)
+
+        fig.tight_layout(pad=0)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        assert np.all(np.array(model['batches']) ==
+                      np.arange(model['batches'].size))
+
+        print('likelihood')
+        params = list(design['parameters'])
+        fig, axes = plt.subplots(ncols=3, nrows=3, figsize=(12, 9))
+
+        X = design['design'][:nll.size]
+        color = [plt.cm.Blues(1.0 if i in best else 0.5)
+                 for i in range(nll.size)]
+
+        for ax, x, label, limits in zip(
+                axes.flat, X.T, params, design['range']
+        ):
+            ax.scatter(x, nll, s=15, color=color,
+                       edgecolors='white', linewidths=0.2)
+            ax.set_xlabel(label)
+            ax.set_xlim(limits)
+            ax.set_ylim(0, 1.1*nll.max())
+
+        fig.tight_layout(pad=0)
+        pdf.savefig(fig)
+        plt.close(fig)
 
 
 if __name__ == "__main__":

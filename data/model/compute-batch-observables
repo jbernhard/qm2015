@@ -116,7 +116,7 @@ def main():
 
         f.create_dataset('batches',
                          data=np.array([re.search(args.pattern, i).group()
-                                        for i in input_files], dtype='S'),
+                                        for i in input_files], dtype=np.int32),
                          **kwargs)
 
         f.create_dataset('dNch_deta/x', data=middles(nch_pt_cent_bins),
