@@ -114,12 +114,9 @@ def posterior(design, calibration, **kwargs):
     with h5py.File(calibration, 'r') as f:
         chain = np.array(f['chain']).T
 
-    levels = [.68, .95, .99]
-
     cmap = plt.cm.Blues
     line_color = cmap(.8)
     fill_color = cmap(.5, alpha=.1)
-    level_colors = cmap(np.linspace(.5, .9, len(levels)))[::-1]
 
     nxy = chain.shape[0]
     assert nxy == len(labels)
@@ -143,33 +140,17 @@ def posterior(design, calibration, **kwargs):
         ax.set_ylim(xmin, xmax)
 
     for ny, nx in zip(*np.tril_indices_from(axes, k=-1)):
-        x = chain[nx]
-        y = chain[ny]
-
-        def hist(*args, **kwargs):
-            return np.histogram2d(
-                x, y, *args, range=(ranges[nx], ranges[ny]), **kwargs
-            )
-
-        ax = axes[ny][nx]
-        H, xedges, yedges = hist(bins=64)
+        H, xedges, yedges = np.histogram2d(
+            chain[nx], chain[ny], bins=64, range=(ranges[nx], ranges[ny])
+        )
         H[H == 0] = None
-        ax.pcolorfast(xedges, yedges, H.T, cmap=cmap)
+        axes[ny][nx].pcolorfast(xedges, yedges, H.T, cmap=cmap)
 
-        ax = axes[nx][ny]
-        H, xedges, yedges = hist(bins=32)
-        xmids = .5*(xedges[1:] + xedges[:-1])
-        ymids = .5*(yedges[1:] + yedges[:-1])
-        Hsorted = np.sort(H, axis=None)
-        cs = Hsorted.cumsum()
-        cs /= cs[-1]
-        V = np.array([Hsorted[np.count_nonzero(cs <= 1.-i)] for i in levels])
-        ax.plot(np.median(y), np.median(x), 'o', ms=8, mew=0,
-                color=cmap(1., alpha=.9))
-        ax.contour(ymids, xmids, H, V, colors=level_colors)
+        axes[nx][ny].set_axis_off()
 
     for ax in axes.flat:
         set_loc(ax, nbins=4)
+
     for n, label in enumerate(labels):
         axes[-1][n].set_xlabel(label)
         axes[n][0].set_ylabel(label)
