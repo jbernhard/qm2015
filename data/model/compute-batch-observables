@@ -85,7 +85,7 @@ def compute_observables(input, output, num):
         )
     ]
 
-    for n in [2, 3]:
+    for n in [2, 3, 4]:
         output['vn'][str(n)]['Y'][num] = [
             c.flow(n, 2, imaginary='zero') for c in cumulants
         ]
@@ -136,7 +136,7 @@ def main():
 
         empty_kwargs['shape'] = (nbatches, len(flow_cent_bins) - 1)
 
-        for n in [2, 3]:
+        for n in [2, 3, 4]:
             g = f.create_group('vn/{}'.format(n))
 
             if n == 2:

@@ -51,7 +51,7 @@ def main():
               r'${}\;\langle p_T \rangle$'.format(symbol))
              for name, symbol in id_parts],
             [('vn/{}'.format(n), '$v_' + str(n) + '\{2\}$')
-             for n in [2, 3]],
+             for n in [2, 3, 4]],
             [('v3/v2 ratio', '$v_3 / v_2$')]
         )
 
@@ -99,7 +99,7 @@ def main():
         nll_obs = [
             ('dN_dy',   r'$dN/dy$',               [i[0] for i in id_parts]),
             ('mean_pT', r'$\langle p_T \rangle$', [i[0] for i in id_parts]),
-            ('vn',      r'$v_n\{2\}$',            ['2', '3']),
+            ('vn',      r'$v_n\{2\}$',            ['2', '3', '4']),
         ]
 
         nll = sum(compute_nll('{}/{}'.format(a, c))
@@ -112,7 +112,7 @@ def main():
 
         for (key, title, subkeys), ax in zip(nll_obs, axes):
             if key == 'vn':
-                palettes = ['Purples_d', 'Oranges_d']
+                palettes = ['Purples_d', 'Oranges_d', 'Greys_d']
             else:
                 palettes = ['Blues_d', 'Greens_d', 'Reds_d']
 

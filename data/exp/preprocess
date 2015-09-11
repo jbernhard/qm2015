@@ -53,7 +53,7 @@ def process_pt(f):
 
 
 def process_vn(f):
-    for n in [2, 3]:
+    for n in [2, 3, 4]:
         # columns = np.concatenate([
         #     np.loadtxt('{}_v{}_central.dat'.format(experiment, n)),
         #     np.loadtxt('{}_v{}_minbias.dat'.format(experiment, n))[1:],
