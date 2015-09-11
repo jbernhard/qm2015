@@ -177,10 +177,7 @@ def observables_samples(calibration, exp_data, **kwargs):
         ('vn', 'Flow cumulants', r'$v_n\{2\}$', (0, 0.11), flows),
     ]
 
-    fig, axes = plt.subplots(
-        ncols=len(plots),
-        figsize=(plotwidth, 1.1*aspect*plotwidth/len(plots))
-    )
+    fig, axes = plt.subplots(nrows=len(plots), sharex='col', figsize=(9, 16))
 
     with \
             h5py.File(calibration, 'r') as cal, \
@@ -203,11 +200,10 @@ def observables_samples(calibration, exp_data, **kwargs):
                             capsize=0, color='0.2', zorder=1000)
 
                 ax.text(x[-1] + 2, y[-1], label, ha='left', va='center',
-                        size=fontsmall)
+                        size=fontnormal)
 
-            ax.set_xlim(0, 72.5)
+            ax.set_xlim(0, 70)
             ax.set_ylim(ylim)
-            ax.set_xlabel('Centrality %')
             ax.set_ylabel(ylabel, labelpad=10)
             ax.set_title(title)
 
@@ -217,7 +213,9 @@ def observables_samples(calibration, exp_data, **kwargs):
             else:
                 set_loc(ax, 'y', nbins=6)
 
-    finish(h_pad=2)
+    axes[-1].set_xlabel('Centrality %', labelpad=10)
+
+    finish(h_pad=1)
 
 
 @plot
