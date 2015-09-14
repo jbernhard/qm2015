@@ -181,7 +181,7 @@ def observables_samples(calibration, exp_data, **kwargs):
         ('vn', 'Flow cumulants', r'$v_n\{2\}$', (0, 0.11), flows),
     ]
 
-    fig, axes = plt.subplots(nrows=len(plots), sharex='col', figsize=(9, 16))
+    fig, axes = plt.subplots(nrows=len(plots), figsize=(9, 16))
 
     with \
             h5py.File(calibration, 'r') as cal, \
