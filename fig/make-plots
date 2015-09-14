@@ -114,12 +114,10 @@ def posterior(design, calibration, **kwargs):
     with h5py.File(calibration, 'r') as f:
         chain = np.array(f['chain']).T
 
-    cmap = plt.cm.Blues
-    line_color = cmap(.8)
-    fill_color = cmap(.5, alpha=.1)
-
     nxy = chain.shape[0]
     assert nxy == len(labels)
+
+    normal_cmap, highlight_cmap = plt.cm.Blues, plt.cm.Oranges
 
     fig, axes = plt.subplots(
         nrows=nxy, ncols=nxy,
@@ -127,14 +125,19 @@ def posterior(design, calibration, **kwargs):
         figsize=(plotwidth, plotwidth)
     )
 
-    for ax, x, (xmin, xmax) in zip(axes.diagonal(), chain, ranges):
+    for n, (ax, x, (xmin, xmax)) in enumerate(
+            zip(axes.diagonal(), chain, ranges)):
+        cmap = highlight_cmap if n in [1, 7, 8] else normal_cmap
+        line_color = cmap(.8)
+        fill_color = cmap(.5, alpha=.1)
+
         counts, edges = np.histogram(
             x, bins=64, range=(xmin, xmax), density=True
         )
         middles = .5 * (edges[1:] + edges[:-1])
         counts *= .9 * (xmax - xmin) / counts.max()
         counts += xmin
-        ax.plot(middles, counts, color=line_color)
+        ax.plot(middles, counts, lw=2, color=line_color)
         ax.fill_between(middles, xmin, counts, color=fill_color)
         ax.set_xlim(xmin, xmax)
         ax.set_ylim(xmin, xmax)
@@ -144,6 +147,7 @@ def posterior(design, calibration, **kwargs):
             chain[nx], chain[ny], bins=64, range=(ranges[nx], ranges[ny])
         )
         H[H == 0] = None
+        cmap = highlight_cmap if (ny, nx) == (6, 5) else normal_cmap
         axes[ny][nx].pcolorfast(xedges, yedges, H.T, cmap=cmap)
 
         axes[nx][ny].set_axis_off()
