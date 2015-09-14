@@ -8,8 +8,6 @@ import matplotlib.ticker as tick
 import h5py
 
 
-plotwidth = 0.7*33.1  # A0 width = 33.1 inches
-aspect = 1/1.618
 fontsmall, fontnormal = 18, 22
 offblack = '#262626'
 
@@ -122,7 +120,7 @@ def posterior(design, calibration, **kwargs):
     fig, axes = plt.subplots(
         nrows=nxy, ncols=nxy,
         sharex='col', sharey='row',
-        figsize=(plotwidth, plotwidth)
+        figsize=(22, 22)
     )
 
     for n, (ax, x, (xmin, xmax)) in enumerate(
