@@ -8,7 +8,7 @@ import matplotlib.ticker as tick
 import h5py
 
 
-fontsmall, fontnormal = 18, 22
+fontsmall, fontnormal = 18, 24
 offblack = '#262626'
 
 plt.rcdefaults()
