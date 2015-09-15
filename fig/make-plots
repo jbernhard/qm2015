@@ -89,7 +89,8 @@ def finish(despine=True, remove_ticks=False, pad=0.1, h_pad=None, w_pad=None):
     fig.tight_layout(pad=pad, h_pad=h_pad, w_pad=w_pad)
 
 
-def set_loc(ax, xy=None, nbins=5, steps=(1, 2, 3, 4, 10), prune=None):
+def set_loc(ax, xy=None, nbins=5, steps=(1, 2, 3, 4, 10),
+            prune=None, minor=0):
     if xy == 'x':
         axes = ax.xaxis,
     elif xy == 'y':
@@ -101,6 +102,8 @@ def set_loc(ax, xy=None, nbins=5, steps=(1, 2, 3, 4, 10), prune=None):
         axis.set_major_locator(
             tick.MaxNLocator(nbins=nbins, steps=steps, prune=prune)
         )
+        if minor:
+            axis.set_minor_locator(tick.AutoMinorLocator(minor))
 
 
 @plot
@@ -120,38 +123,33 @@ def posterior(design, calibration, **kwargs):
     fig, axes = plt.subplots(
         nrows=nxy, ncols=nxy,
         sharex='col', sharey='row',
-        figsize=(22, 22)
+        figsize=(21, 21)
     )
 
-    for n, (ax, x, (xmin, xmax)) in enumerate(
-            zip(axes.diagonal(), chain, ranges)):
+    for n, (ax, c, lim) in enumerate(zip(axes.diagonal(), chain, ranges)):
         cmap = highlight_cmap if n in [1, 7, 8] else normal_cmap
         line_color = cmap(.8)
         fill_color = cmap(.5, alpha=.1)
 
-        counts, edges = np.histogram(
-            x, bins=64, range=(xmin, xmax), density=True
-        )
-        middles = .5 * (edges[1:] + edges[:-1])
-        counts *= .9 * (xmax - xmin) / counts.max()
-        counts += xmin
-        ax.plot(middles, counts, lw=2, color=line_color)
-        ax.fill_between(middles, xmin, counts, color=fill_color)
-        ax.set_xlim(xmin, xmax)
-        ax.set_ylim(xmin, xmax)
+        counts, edges = np.histogram(c, bins=100, range=lim)
+        x = .5 * (edges[1:] + edges[:-1])
+        y = .9 * (lim[1] - lim[0]) * counts / counts.max() + lim[0]
+        ax.plot(x, y, lw=2, color=line_color)
+        ax.fill_between(x, lim[0], y, color=fill_color, zorder=-10)
+
+        ax.set_xlim(lim)
+        ax.set_ylim(lim)
+        set_loc(ax, nbins=4, minor=2)
 
     for ny, nx in zip(*np.tril_indices_from(axes, k=-1)):
         H, xedges, yedges = np.histogram2d(
-            chain[nx], chain[ny], bins=64, range=(ranges[nx], ranges[ny])
+            chain[nx], chain[ny], bins=100, range=(ranges[nx], ranges[ny])
         )
         H[H == 0] = None
         cmap = highlight_cmap if (ny, nx) == (6, 5) else normal_cmap
         axes[ny][nx].pcolorfast(xedges, yedges, H.T, cmap=cmap)
 
         axes[nx][ny].set_axis_off()
-
-    for ax in axes.flat:
-        set_loc(ax, nbins=4)
 
     for n, label in enumerate(labels):
         axes[-1][n].set_xlabel(label)
@@ -179,7 +177,7 @@ def observables_samples(calibration, exp_data, **kwargs):
         ('vn', 'Flow cumulants', r'$v_n\{2\}$', (0, 0.11), flows),
     ]
 
-    fig, axes = plt.subplots(nrows=len(plots), figsize=(9, 16))
+    fig, axes = plt.subplots(nrows=len(plots), figsize=(8, 15))
 
     with \
             h5py.File(calibration, 'r') as cal, \
@@ -244,47 +242,57 @@ def _zetas(T, Tc=0.180,
 
 @plot
 def viscosity_samples(calibration, **kwargs):
-    fig, axes = plt.subplots(nrows=2, figsize=(9, 11))
+    fig, axes = plt.subplots(nrows=2, figsize=(7.85, 9))
     etas_ax, zetas_ax = axes
 
     Tmin, Tc, Tmax = 0.145, 0.154, 0.300
     T1 = np.linspace(Tmin, Tmax, 1000)
     T2 = np.linspace(Tc, Tmax, 100)
-    kwargs = dict(color=plt.cm.Blues(0.7), alpha=0.2, lw=0.7)
+
+    line_kwargs = dict(color=plt.cm.Blues(0.7), alpha=0.2, lw=0.7)
 
     with h5py.File(calibration, 'r') as cal:
         sample_idx = np.random.randint(0, cal['chain'].shape[0], size=200)
 
         for i in sample_idx:
             etas_min, etas_slope, zetas_norm = cal['chain'][i, 5:8]
-            etas_ax.plot(T2, etas_min + etas_slope*(T2 - Tc), **kwargs)
-            zetas_ax.plot(T1, zetas_norm*_zetas(T1), **kwargs)
+            etas_ax.plot(T2, etas_min + etas_slope*(T2 - Tc), **line_kwargs)
+            zetas_ax.plot(T1, zetas_norm*_zetas(T1), **line_kwargs)
 
-    text_color = '0.35'
+    text_kwargs = dict(fontsize=20)
     fill_kwargs = dict(color='0.9', zorder=-1000)
 
     etas_ax.fill_between(T2, 0.3 + 2*(T2 - Tc), **fill_kwargs)
-    etas_ax.axvline(Tc, ls='dashed', lw=1, color=text_color)
-    etas_ax.text(Tc + 0.003, 0.5, '$T_c = {}$ GeV'.format(Tc),
-                 ha='left', va='center', color=text_color)
-    etas_ax.text(0.21, 0.42, 'initial range', color=text_color, rotation=17)
+    etas_ax.axvline(Tc, ls='dashed', lw=1, color='0.3')
+    etas_ax.text(Tc + 0.003, 0.5, '$T_c = \,{}$ GeV'.format(Tc),
+                 ha='left', va='center', **text_kwargs)
+
+    points = etas_ax.transData.transform([
+        (Tc, 0.3),
+        (Tmax, 0.3 + 2*(Tmax-Tc))
+    ])
+    dx, dy = points[1] - points[0]
+    angle = 180/np.pi * np.arctan2(dy, dx)
+    etas_ax.text((Tmax + Tc)/2, 0.28 + Tmax - Tc, 'initial range',
+                 rotation=angle, ha='center', **text_kwargs)
+
     etas_ax.text(
-        0.296, 0.04,
-        '$(\eta/s)(T) = '
+        0.205, 0.04,
+        '$(\eta/s)(T) =\,'
         '(\eta/s)_\mathrm{min} + (\eta/s)_\mathrm{slope}(T - T_c)$',
-        ha='right', color=text_color
+        **text_kwargs
     )
     etas_ax.set_ylabel(r'$\eta/s$', labelpad=10)
 
     zetas_ax.plot(T1, _zetas(T1), color=offblack, lw=2)
     zetas_ax.fill_between(T1, 2*_zetas(T1), **fill_kwargs)
-    zetas_ax.text(0.193, 0.52, 'initial range', color=text_color)
+    zetas_ax.text(0.193, 0.52, 'initial range', **text_kwargs)
     zetas_ax.text(
-        0.21, 0.40,
-        '$(\zeta/s)(T)$ parametrization from [?]\n'
-        'vary overall normalization 0–2\n'
+        0.22, 0.40,
+        '$(\zeta/s)(T)$ from Denicol et al.\n'
+        'vary overall normalization\n'
         'black line: norm = 1',
-        va='top', color=text_color
+        va='top', **text_kwargs
     )
     zetas_ax.set_xlabel('Temperature [GeV]', labelpad=10)
     zetas_ax.set_ylabel(r'$\zeta/s$', labelpad=10)
