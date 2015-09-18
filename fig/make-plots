@@ -110,10 +110,13 @@ def set_loc(ax, xy=None, nbins=5, steps=(1, 2, 3, 4, 10),
 def posterior(design, calibration, **kwargs):
     with h5py.File(design, 'r') as f:
         labels = list(f['parameters'])
-        ranges = np.array(f['range'])
+        etas_hrg_index = 4
+        indices = np.arange(len(labels)) != etas_hrg_index
+        del labels[etas_hrg_index]
+        ranges = np.array(f['range'])[indices]
 
     with h5py.File(calibration, 'r') as f:
-        chain = np.array(f['chain']).T
+        chain = np.array(f['chain']).T[indices]
 
     nxy = chain.shape[0]
     assert nxy == len(labels)
@@ -127,7 +130,7 @@ def posterior(design, calibration, **kwargs):
     )
 
     for n, (ax, c, lim) in enumerate(zip(axes.diagonal(), chain, ranges)):
-        cmap = highlight_cmap if n in [1, 7, 8] else normal_cmap
+        cmap = highlight_cmap if n in [1, 6, 7] else normal_cmap
         line_color = cmap(.8)
         fill_color = cmap(.5, alpha=.1)
 
@@ -146,7 +149,7 @@ def posterior(design, calibration, **kwargs):
             chain[nx], chain[ny], bins=100, range=(ranges[nx], ranges[ny])
         )
         H[H == 0] = None
-        cmap = highlight_cmap if (ny, nx) == (6, 5) else normal_cmap
+        cmap = highlight_cmap if (ny, nx) == (5, 4) else normal_cmap
         axes[ny][nx].pcolorfast(xedges, yedges, H.T, cmap=cmap)
 
         axes[nx][ny].set_axis_off()
