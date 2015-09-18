@@ -134,6 +134,10 @@ def posterior(design, calibration, **kwargs):
         line_color = cmap(.8)
         fill_color = cmap(.5, alpha=.1)
 
+        # override range for norm
+        if n == 0:
+            lim = 100, 150
+
         counts, edges = np.histogram(c, bins=100, range=lim)
         x = .5 * (edges[1:] + edges[:-1])
         y = .9 * (lim[1] - lim[0]) * counts / counts.max() + lim[0]
