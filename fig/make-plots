@@ -8,7 +8,7 @@ import matplotlib.ticker as tick
 import h5py
 
 
-fontsmall, fontnormal = 18, 24
+fontsmall, fontnormal, fontlarge = 18, 24, 28
 offblack = '#262626'
 
 plt.rcdefaults()
@@ -23,7 +23,7 @@ plt.rcParams.update({
     'font.size': fontnormal,
     'legend.fontsize': fontnormal,
     'axes.labelsize': fontnormal,
-    'axes.titlesize': fontnormal,
+    'axes.titlesize': fontlarge,
     'xtick.labelsize': fontsmall,
     'ytick.labelsize': fontsmall,
     'font.weight': 400,
@@ -140,7 +140,7 @@ def posterior(design, calibration, **kwargs):
 
         counts, edges = np.histogram(c, bins=100, range=lim)
         x = (edges[1:] + edges[:-1]) / 2
-        y = .86 * (lim[1] - lim[0]) * counts / counts.max() + lim[0]
+        y = .84 * (lim[1] - lim[0]) * counts / counts.max() + lim[0]
         ax.plot(x, y, lw=2, color=line_color)
         ax.fill_between(x, lim[0], y, color=fill_color, zorder=-10)
 
@@ -148,8 +148,7 @@ def posterior(design, calibration, **kwargs):
             mode = x[y.argmax()]
             fmt_str = '{:#.2g}' if n == 1 else '{:#.3g}'
             ax.text(mode, lim[1], fmt_str.format(mode),
-                    ha='left' if mode < 0.4*sum(lim) else 'center', va='top',
-                    fontsize=fontsmall)
+                    ha='left' if mode < 0.4*sum(lim) else 'center', va='top')
 
         ax.set_xlim(lim)
         ax.set_ylim(lim)
