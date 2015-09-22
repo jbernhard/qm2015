@@ -332,9 +332,9 @@ def main():
         for i in args.plots:
             if i.endswith('.pdf'):
                 i = i[:-4]
-            try:
+            if i in plot_functions:
                 plot_functions[i](**vars(args))
-            except KeyError:
+            else:
                 print('unknown plot:', i)
     else:
         for f in plot_functions.values():
