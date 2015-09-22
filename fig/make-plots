@@ -317,12 +317,81 @@ def viscosity_samples(calibration, **kwargs):
     finish(h_pad=1)
 
 
+@plot
+def mode_observables(batch_obs_mode, exp_data, **kwargs):
+    id_parts = [
+        ('pion',   r'$\pi^\pm$', 'Blues'),
+        ('kaon',   r'$K^\pm$', 'Greens'),
+        ('proton', r'$p\bar p$', 'Reds')
+    ]
+
+    flows = [(str(n), '$v_{}$'.format(n), c)
+             for n, c in enumerate(['GnBu', 'Purples', 'Oranges'], start=2)]
+
+    plots = [
+        ('dN_dy', 'Identified particle yields', r'$dN/dy$', (1, 3e3),
+         id_parts),
+        ('mean_pT', 'Identified particle mean $p_T$',
+         r'$p_T$ [GeV]', (0, 1.5), id_parts),
+        ('vn', 'Flow cumulants', r'$v_n\{2\}$', (0, 0.11), flows),
+    ]
+
+    fig = plt.figure(figsize=(25, 9))
+    gs = plt.GridSpec(3, len(plots))
+
+    with \
+            h5py.File(batch_obs_mode, 'r') as mode, \
+            h5py.File(exp_data, 'r') as exp:
+        for n, (obs, title, ylabel, ylim, subplots) in enumerate(plots):
+            ax = fig.add_subplot(gs[:2, n])
+            ratio_ax = fig.add_subplot(gs[2, n])
+
+            for subobs, label, cmap in subplots:
+                color = getattr(plt.cm, cmap)(0.7)
+                ncent = min(i[obs][subobs]['x'].size for i in [mode, exp])
+
+                x = mode[obs][subobs]['x'][:ncent]
+                y = mode[obs][subobs]['Y'][0, :ncent]
+                ax.plot(x, y, color=color, lw=1.7)
+
+                yexp, yexperr = (exp[obs][subobs][k][:ncent]
+                                 for k in ['y', 'yerr'])
+                ax.errorbar(x, yexp, yerr=yexperr, fmt='o',
+                            capsize=0, color='0.2', zorder=1000)
+
+                ax.text(x[-1] + 3, y[-1], label, ha='left', va='center',
+                        size=fontnormal)
+
+                ratio_ax.plot(x, y/yexp, color=color, lw=2)
+
+            ax.set_ylim(ylim)
+            ax.set_ylabel(ylabel, labelpad=10)
+            ax.set_title(title)
+
+            if obs == 'dN_dy':
+                ax.set_yscale('log')
+                ax.minorticks_off()
+            else:
+                set_loc(ax, 'y', nbins=6)
+
+            ratio_ax.axhline(1, color='0.5', lw=1, zorder=-100)
+            ratio_ax.axhspan(0.9, 1.1, color='0.95', zorder=-200)
+
+            ratio_ax.set_xlabel('Centrality %', labelpad=10)
+            ratio_ax.set_ylim(0.8, 1.2)
+            ratio_ax.set_yticks(np.arange(80, 121, 10)/100)
+            ratio_ax.set_ylabel('Ratio', labelpad=10)
+
+    finish(pad=0.2, h_pad=0.5, w_pad=1.5)
+
+
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--design', default='../data/model/design.hdf')
     parser.add_argument('--calibration', default='../calibration/results.hdf')
     parser.add_argument('--exp-data', default='../data/exp/data.hdf')
+    parser.add_argument('--batch-obs-mode', default='../data/model/batch-observables-mode.hdf')
 
     parser.add_argument('plots', nargs='*')
 
