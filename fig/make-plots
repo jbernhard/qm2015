@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as tick
 import h5py
+import mtd
 
 
 fontsmall, fontnormal, fontlarge = 18, 24, 28
@@ -89,7 +90,7 @@ def finish(despine=True, remove_ticks=False, pad=0.1, h_pad=None, w_pad=None):
     fig.tight_layout(pad=pad, h_pad=h_pad, w_pad=w_pad)
 
 
-def set_loc(ax, xy=None, nbins=5, steps=(1, 2, 3, 4, 10),
+def set_loc(ax, xy=None, nbins=5, steps=[1, 2, 3, 4, 10],
             prune=None, minor=0):
     if xy == 'x':
         axes = ax.xaxis,
@@ -109,7 +110,7 @@ def set_loc(ax, xy=None, nbins=5, steps=(1, 2, 3, 4, 10),
 @plot
 def posterior(design, calibration, **kwargs):
     with h5py.File(design, 'r') as f:
-        labels = list(f['parameters'])
+        labels = list(f['labels'])
         etas_hrg_index = 4
         indices = np.arange(len(labels)) != etas_hrg_index
         del labels[etas_hrg_index]
@@ -171,8 +172,124 @@ def posterior(design, calibration, **kwargs):
     finish()
 
 
+def _posterior_single(design, calibration, n):
+    with h5py.File(design, 'r') as f:
+        label = f['labels'][n]
+        lim = f['range'][n]
+
+    with h5py.File(calibration, 'r') as f:
+        chain = f['chain'][:, n]
+
+    fig = plt.figure(figsize=(7, 5))
+    ax = fig.gca()
+
+    counts, edges = np.histogram(chain, bins=100, range=lim)
+    x = (edges[1:] + edges[:-1]) / 2
+    y = counts
+    ax.plot(x, y, lw=2, color=plt.cm.Blues(0.8))
+    ax.fill_between(x, y, color=plt.cm.Blues(0.15), zorder=-10)
+
+    mode = x[y.argmax()]
+    fmt_str = '{:#.2g}' if n == 1 else '{:#.3g}'
+    ax.text(mode, y.max() + .02*y.ptp(), fmt_str.format(mode),
+            fontsize=22, ha='center', va='bottom')
+
+    ax.set_xlim(lim)
+    ax.set_xlabel(label)
+    set_loc(ax, 'x', nbins=4, minor=2, steps=[1, 2, 3, 4, 5, 10])
+
+    ax.spines['left'].set_visible(False)
+    ax.set_yticks([])
+
+    finish()
+
+
 @plot
-def observables_samples(calibration, exp_data, **kwargs):
+def posterior_p(design, calibration, **kwargs):
+    _posterior_single(design, calibration, 1)
+
+
+@plot
+def posterior_bulk(design, calibration, **kwargs):
+    _posterior_single(design, calibration, 7)
+
+
+@plot
+def posterior_tswitch(design, calibration, **kwargs):
+    _posterior_single(design, calibration, 8)
+
+
+@plot
+def posterior_shear(design, calibration, **kwargs):
+    fig = plt.figure(figsize=(8, 8))
+    ratio = 5
+    gs = plt.GridSpec(ratio + 1, ratio + 1)
+
+    ax_j = fig.add_subplot(gs[1:, :-1])
+    ax_x = fig.add_subplot(gs[0, :-1], sharex=ax_j)
+    ax_y = fig.add_subplot(gs[1:, -1], sharey=ax_j)
+
+    i, j = 5, 6
+
+    with h5py.File(design, 'r') as f:
+        xlabel = f['labels'][i]
+        ylabel = f['labels'][j]
+        xlim = f['range'][i, :]
+        ylim = f['range'][j, :]
+
+    with h5py.File(calibration, 'r') as f:
+        x = f['chain'][:, i]
+        y = f['chain'][:, j]
+
+    H, xedges, yedges = np.histogram2d(x, y, bins=100, range=(xlim, ylim))
+    H[H == 0] = None
+    ax_j.pcolorfast(xedges, yedges, H.T, cmap=plt.cm.Blues)
+
+    for chain, lim, ax in (x, xlim, ax_x), (y, ylim, ax_y):
+        counts, edges = np.histogram(chain, bins=100, range=lim)
+        x_ = (edges[1:] + edges[:-1]) / 2
+        y_ = counts
+
+        if ax is ax_x:
+            plotargs = x_, y_
+            fillfunc = ax.fill_between
+        else:
+            x_ = x_[::-1]
+            ax.set_xlim(0, 1.5*y_.max())
+            plotargs = y_, x_
+            fillfunc = ax.fill_betweenx
+
+        ax.plot(*plotargs, lw=1.7, color=plt.cm.Blues(0.8))
+        fillfunc(x_, y_, color=plt.cm.Blues(0.1), zorder=-10)
+
+    set_loc(ax_j, nbins=4, minor=2, steps=[1, 2, 3, 4, 5, 10])
+
+    for ax in fig.axes:
+        ax.tick_params(which='both', top='off', right='off')
+        spines = ['top', 'right']
+        if ax is ax_x or ax is ax_y:
+            ax.tick_params(labelbottom='off', labelleft='off')
+            if ax is ax_x:
+                ax.tick_params('x', which='both', top='off')
+                ax.tick_params('y', which='both', left='off', right='off')
+                spines += ['left']
+            else:
+                ax.tick_params('x', which='both', top='off', bottom='off')
+                ax.tick_params('y', which='both', right='off')
+                spines += ['bottom']
+        for spine in spines:
+            ax.spines[spine].set_visible(False)
+
+    ax_j.set_xlim(xlim)
+    ax_j.set_ylim(ylim)
+
+    ax_j.set_xlabel(xlabel, labelpad=10)
+    ax_j.set_ylabel(ylabel, labelpad=10)
+
+    gs.tight_layout(fig=fig, pad=.1)
+
+
+def _observables_plot(model_data, exp_data, posterior=False, vertical=True):
     id_parts = [
         ('pion',   r'$\pi^\pm$', 'Blues'),
         ('kaon',   r'$K^\pm$', 'Greens'),
@@ -183,37 +300,47 @@ def observables_samples(calibration, exp_data, **kwargs):
              for n, c in enumerate(['GnBu', 'Purples', 'Oranges'], start=2)]
 
     plots = [
-        ('dN_dy', 'Identified particle yields', r'$dN/dy$', (1, 3e3),
+        ('dN_dy', 'Identified particle yields', r'$dN/dy$', (1, 4e3),
          id_parts),
         ('mean_pT', 'Identified particle mean $p_T$',
-         r'$p_T$ [GeV]', (0, 1.5), id_parts),
-        ('vn', 'Flow cumulants', r'$v_n\{2\}$', (0, 0.11), flows),
+         r'$p_T$ [GeV]', (0, 1.8), id_parts),
+        ('vn', 'Flow cumulants', r'$v_n\{2\}$', (0, 0.12), flows),
     ]
 
-    fig, axes = plt.subplots(nrows=len(plots), figsize=(8, 15))
+    if vertical:
+        fig, axes = plt.subplots(nrows=len(plots), figsize=(8, 15))
+    else:
+        fig, axes = plt.subplots(ncols=len(plots), figsize=(22, 6))
 
     with \
-            h5py.File(calibration, 'r') as cal, \
+            h5py.File(model_data, 'r') as model, \
             h5py.File(exp_data, 'r') as exp:
-        sample_idx = np.random.randint(0, cal['chain'].shape[0], size=100)
+        if posterior:
+            samples = np.random.randint(0, model['chain'].shape[0], size=100)
 
         for ax, (obs, title, ylabel, ylim, subplots) in zip(axes, plots):
             for subobs, label, cmap in subplots:
                 color = getattr(plt.cm, cmap)(0.6)
 
-                samples_dset = cal['samples'][obs][subobs]
-                x, y, yerr = (exp[obs][subobs][k][:samples_dset.shape[1]]
-                              for k in ['x', 'y', 'yerr'])
+                n = 6 if obs == 'vn' and subobs != '2' else 8
 
-                for i in sample_idx:
-                    ax.plot(x, samples_dset[i],
-                            color=color, alpha=0.2, lw=0.5)
+                x, y, yerr = (exp[obs][subobs][k][:n]
+                              for k in ['x', 'y', 'yerr'])
 
                 ax.errorbar(x, y, yerr=yerr, fmt='o',
                             capsize=0, color='0.2', zorder=1000)
 
                 ax.text(x[-1] + 2, y[-1], label, ha='left', va='center',
                         size=fontnormal)
+
+                kwargs = dict(color=color, alpha=0.2, lw=0.5)
+
+                if posterior:
+                    for i in samples:
+                        ax.plot(x, model['samples'][obs][subobs][i], **kwargs)
+                else:
+                    for y in model[obs][subobs]['Y'][:, :n]:
+                        ax.plot(x, y, **kwargs)
 
             ax.set_xlim(0, 70)
             ax.set_ylim(ylim)
@@ -226,9 +353,33 @@ def observables_samples(calibration, exp_data, **kwargs):
             else:
                 set_loc(ax, 'y', nbins=6)
 
-    axes[-1].set_xlabel('Centrality %', labelpad=10)
+    if vertical:
+        axes[-1].set_xlabel('Centrality %', labelpad=10)
+        finish(h_pad=1)
+    else:
+        for ax in axes:
+            ax.set_xlabel('Centrality %', labelpad=10)
+        finish(w_pad=0.5)
 
-    finish(h_pad=1)
+
+@plot
+def observables_horizontal_prior(batch_obs, exp_data, **kwargs):
+    _observables_plot(batch_obs, exp_data, posterior=False, vertical=False)
+
+
+@plot
+def observables_vertical_prior(batch_obs, exp_data, **kwargs):
+    _observables_plot(batch_obs, exp_data, posterior=False, vertical=True)
+
+
+@plot
+def observables_horizontal_posterior(calibration, exp_data, **kwargs):
+    _observables_plot(calibration, exp_data, posterior=True, vertical=False)
+
+
+@plot
+def observables_vertical_posterior(calibration, exp_data, **kwargs):
+    _observables_plot(calibration, exp_data, posterior=True, vertical=True)
 
 
 def _zetas(T, Tc=0.180,
@@ -253,8 +404,7 @@ def _zetas(T, Tc=0.180,
     return zetas
 
 
-@plot
-def viscosity_samples(calibration, **kwargs):
+def _viscosity_samples(calibration=None):
     fig, axes = plt.subplots(nrows=2, figsize=(7.85, 9))
     etas_ax, zetas_ax = axes
 
@@ -262,15 +412,18 @@ def viscosity_samples(calibration, **kwargs):
     T1 = np.linspace(Tmin, Tmax, 1000)
     T2 = np.linspace(Tc, Tmax, 100)
 
-    line_kwargs = dict(color=plt.cm.Blues(0.7), alpha=0.2, lw=0.7)
+    if calibration is not None:
+        line_kwargs = dict(color=plt.cm.Blues(0.7), alpha=0.2, lw=0.7)
 
-    with h5py.File(calibration, 'r') as cal:
-        sample_idx = np.random.randint(0, cal['chain'].shape[0], size=200)
+        with h5py.File(calibration, 'r') as cal:
+            sample_idx = np.random.randint(0, cal['chain'].shape[0], size=200)
 
-        for i in sample_idx:
-            etas_min, etas_slope, zetas_norm = cal['chain'][i, 5:8]
-            etas_ax.plot(T2, etas_min + etas_slope*(T2 - Tc), **line_kwargs)
-            zetas_ax.plot(T1, zetas_norm*_zetas(T1), **line_kwargs)
+            for i in sample_idx:
+                etas_min, etas_slope, zetas_norm = cal['chain'][i, 5:8]
+                etas_ax.plot(T2, etas_min + etas_slope*(T2 - Tc),
+                             **line_kwargs)
+                zetas_ax.plot(T1, zetas_norm*_zetas(T1),
+                              **line_kwargs)
 
     text_kwargs = dict(fontsize=20)
     fill_kwargs = dict(color='0.9', zorder=-1000)
@@ -315,6 +468,16 @@ def viscosity_samples(calibration, **kwargs):
         ax.set_xlim(Tmin, Tmax)
 
     finish(h_pad=1)
+
+
+@plot
+def viscosity_samples(calibration, **kwargs):
+    _viscosity_samples(calibration)
+
+
+@plot
+def viscosity_samples_empty(**kwargs):
+    _viscosity_samples()
 
 
 @plot
@@ -385,13 +548,183 @@ def mode_observables(batch_obs_mode, exp_data, **kwargs):
     finish(pad=0.2, h_pad=0.5, w_pad=1.5)
 
 
+@plot
+def design(design, **kwargs):
+    fig = plt.figure(figsize=(7, 7))
+    ratio = 5
+    gs = plt.GridSpec(ratio + 1, ratio + 1)
+
+    ax_j = fig.add_subplot(gs[1:, :-1])
+    ax_x = fig.add_subplot(gs[0, :-1], sharex=ax_j)
+    ax_y = fig.add_subplot(gs[1:, -1], sharey=ax_j)
+
+    with h5py.File(design, 'r') as f:
+        i, j = 5, 6
+        x = f['design/main'][:, i]
+        y = f['design/main'][:, j]
+        xlabel = f['labels'][i]
+        ylabel = f['labels'][j]
+        xlim = f['range'][i, :]
+        ylim = f['range'][j, :]
+
+    ax_j.plot(x, y, 'o', ms=6, color=plt.cm.Blues(0.75), mec='white', mew=.5)
+
+    hist_kw = dict(bins=30, color=plt.cm.Blues(0.4), edgecolor='white')
+    ax_x.hist(x, **hist_kw)
+    ax_y.hist(y, orientation='horizontal', **hist_kw)
+
+    for ax in fig.axes:
+        ax.tick_params(top='off', right='off')
+        spines = ['top', 'right']
+        if ax is ax_x:
+            spines += ['left']
+        elif ax is ax_y:
+            spines += ['bottom']
+        for spine in spines:
+            ax.spines[spine].set_visible(False)
+        for ax_name in 'xaxis', 'yaxis':
+            getattr(ax, ax_name).set_ticks_position('none')
+
+    for ax in ax_x, ax_y:
+        ax.tick_params(labelbottom='off', labelleft='off')
+
+    ax_j.set_xlim(xlim)
+    ax_j.set_ylim(ylim)
+    set_loc(ax_j, nbins=4, steps=[1, 2, 3, 4, 5, 10])
+
+    ax_j.set_xlabel(xlabel, labelpad=10)
+    ax_j.set_ylabel(ylabel, labelpad=10)
+
+    gs.tight_layout(fig=fig, pad=0.)
+
+
+@plot
+def pca(batch_obs, **kwargs):
+    fig = plt.figure(figsize=(7, 7))
+    ratio = 5
+    gs = plt.GridSpec(ratio + 1, ratio + 1)
+
+    ax_j = fig.add_subplot(gs[1:, :-1])
+    ax_x = fig.add_subplot(gs[0, :-1], sharex=ax_j)
+    ax_y = fig.add_subplot(gs[1:, -1], sharey=ax_j)
+
+    with h5py.File(batch_obs, 'r') as f:
+        i = 3
+        x = f['dN_dy/pion/Y'][:, i]
+        y = f['vn/2/Y'][:, i]
+        xlabel = r'$dN_{\pi^\pm}/dy$'
+        ylabel = r'$v_2\{2\}$'
+        xlim = 0, 2000
+        ylim = 0, 0.12
+
+    ax_j.plot(x, y, 'o', ms=6, color=plt.cm.Blues(0.75), mec='white', mew=.5,
+              zorder=10)
+
+    hist_kw = dict(bins=16, color=plt.cm.Blues(0.4), edgecolor='white')
+    ax_x.hist(x, **hist_kw)
+    ax_y.hist(y, orientation='horizontal', **hist_kw)
+
+    xy = np.column_stack((x, y))
+    xymean = xy.mean(axis=0)
+    xystd = xy.std(axis=0)
+    xy -= xymean
+    xy /= xystd
+    pca = mtd.PCA(xy)
+    pc = 5.5 * xystd * pca.weights[:, np.newaxis] * pca.pc
+
+    for w, p in zip(pca.weights, pc):
+        if np.all(p < 0):
+            p *= -1
+        ax_j.annotate('', xymean + p, xymean,
+                      zorder=20, arrowprops=dict(
+                          arrowstyle='->', shrinkA=0, shrinkB=0,
+                          color=offblack, lw=1.5
+                      ))
+        ax_j.text(*(xymean + p + (.8, .002)*np.sign(p)),
+                  s='{:.0f}%'.format(100*w), color=offblack, fontsize=20,
+                  ha='center', va='top' if p[1] < 0 else 'bottom',
+                  zorder=20)
+
+    for ax in fig.axes:
+        ax.tick_params(top='off', right='off')
+        spines = ['top', 'right']
+        if ax is ax_x:
+            spines += ['left']
+        elif ax is ax_y:
+            spines += ['bottom']
+        for spine in spines:
+            ax.spines[spine].set_visible(False)
+        for ax_name in 'xaxis', 'yaxis':
+            getattr(ax, ax_name).set_ticks_position('none')
+
+    for ax in ax_x, ax_y:
+        ax.tick_params(labelbottom='off', labelleft='off')
+
+    ax_j.set_xlim(xlim)
+    ax_j.set_ylim(ylim)
+    set_loc(ax_j, nbins=4, steps=[1, 2, 3, 4, 5, 10])
+
+    ax_j.set_xlabel(xlabel, labelpad=10)
+    ax_j.set_ylabel(ylabel, labelpad=10)
+
+    ax_j.annotate('20–30%', (.03, .03), xycoords='axes fraction',
+                  ha='left', va='bottom', fontsize=20)
+
+    gs.tight_layout(fig=fig, pad=0.)
+
+
+@plot
+def validation(calibration, batch_obs_validation, **kwargs):
+    observables = [
+        ('dN_dy/pion', r'$dN_{\pi^\pm}/dy$', (0, 3200)),
+        ('mean_pT/pion', r'$\langle p_T \rangle_{\pi^\pm}$', (0.4, 0.75)),
+        ('vn/2', r'$v_2\{2\}$', (0, 0.13)),
+    ]
+
+    cent_edges = [0, 5, 10, 20, 30, 40, 50, 60, 70, 80]
+    cent_bins = list(zip(cent_edges[:-1], cent_edges[1:]))
+
+    fig, axes = plt.subplots(ncols=len(observables), figsize=(20, 7))
+
+    with \
+            h5py.File(calibration, 'r') as cal, \
+            h5py.File(batch_obs_validation, 'r') as vld:
+        for (key, label, lim), ax in zip(observables, axes):
+            for i, cmap in (0, 'Blues'), (4, 'Oranges'):
+                x = cal['validation'][key]['Y'][:, i]
+                xerr = cal['validation'][key]['Yerr'][:, i]
+                y = vld[key]['Y'][:, i]
+                yerr = vld[key]['Yerr'][:, i]
+                ax.errorbar(
+                    x, y, xerr=xerr, yerr=yerr, fmt='o', ms=7, capsize=0,
+                    color=getattr(plt.cm, cmap)(0.8), mec='white', mew=0.5,
+                    label='–'.join(map(str, cent_bins[i])) + '%'
+                )
+            ax.plot(lim, lim, lw=1, color='.7', zorder=-10)
+            ax.set_xlim(lim)
+            ax.set_ylim(lim)
+            ax.set_aspect('equal')
+            ax.set_xlabel('Predicted ' + label, labelpad=10)
+            if ax.is_first_col():
+                ax.set_ylabel('Observed', labelpad=10)
+                ax.legend(loc='best', handletextpad=0)
+            set_loc(ax)
+
+    finish(pad=0.7)
+
+
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--design', default='../data/model/design.hdf')
     parser.add_argument('--calibration', default='../calibration/results.hdf')
     parser.add_argument('--exp-data', default='../data/exp/data.hdf')
-    parser.add_argument('--batch-obs-mode', default='../data/model/batch-observables-mode.hdf')
+
+    for suffix in ['', '-mode', '-validation']:
+        parser.add_argument(
+            '--batch-obs' + suffix,
+            default='../data/model/batch-observables{}.hdf'.format(suffix)
+        )
 
     parser.add_argument('plots', nargs='*')
 
