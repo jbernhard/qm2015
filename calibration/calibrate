@@ -60,7 +60,8 @@ def main():
         exp_data = np.hstack([f[k]['y'][:n] for k, n in observables])
 
     with h5py.File(args.design, 'r') as f:
-        design = f['design'][:nsamples]
+        design = f['design/main'][:nsamples]
+        vdesign = np.array(f['design/validation'])
 
     ndim = design.shape[1]
 
@@ -105,22 +106,35 @@ def main():
         verbose=True
     )
 
+    print('predicting validation design')
+
+    vmean, vvar = mgp.predict(vdesign, mean_only=False)
+    vstd = np.sqrt(vvar, out=vvar)
+
     print('saving results')
+
+    # generator to unpack data back into observables
+    def unpack(samples):
+        endpoints = list(itertools.accumulate(n for _, n in observables))
+        slices = [slice(i, j) for (i, j) in zip([0] + endpoints, endpoints)]
+        samples *= exp_data
+        for (name, _), s in zip(observables, slices):
+            yield name, samples[:, s]
 
     with h5py.File(args.output, 'w') as f:
         f.create_dataset('chain', data=mgp.cal_flatchain, compression='lzf')
 
-        samples = mgp.cal_samples
-        samples *= exp_data
-
-        # determine indices for splitting samples back into each observable
-        endpoints = list(itertools.accumulate(n for _, n in observables))
-        splits = zip([0] + endpoints, endpoints)
-
         g = f.create_group('samples')
 
-        for (name, _), (i, j) in zip(observables, splits):
-            g.create_dataset(name, data=samples[:, i:j], compression='lzf')
+        for name, data in unpack(mgp.cal_samples):
+            g.create_dataset(name, data=data, compression='lzf')
+
+        g = f.create_group('validation')
+
+        for (name, m), (_, s) in zip(unpack(vmean), unpack(vstd)):
+            h = g.create_group(name)
+            h.create_dataset('Y', data=m, compression='lzf')
+            h.create_dataset('Yerr', data=s, compression='lzf')
 
 
 if __name__ == "__main__":
