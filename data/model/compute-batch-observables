@@ -36,7 +36,7 @@ def split_cent_bins(array, bin_edges):
         yield array[i:j]
 
 
-def compute_observables(input, output, num):
+def compute_observables(input, output, num, error=False):
     """
     Read event observables from the input file, postprocess into batch
     observables, and write into the output file as the given batch number.
@@ -51,6 +51,11 @@ def compute_observables(input, output, num):
     output['dNch_deta/Y'][num] = [
         i.mean() for i in split_cent_bins(dNch_deta, nch_pt_cent_bins)
     ]
+    if error:
+        output['dNch_deta/Yerr'][num] = [
+            i.std()/np.sqrt(i.size)
+            for i in split_cent_bins(dNch_deta, nch_pt_cent_bins)
+        ]
 
     # identified particles dN/dy and <pT>
     dN_dy, mean_pT = (
@@ -64,6 +69,11 @@ def compute_observables(input, output, num):
         output['dN_dy'][name]['Y'][num] = [
             i.mean() for i in split_cent_bins(data, nch_pt_cent_bins)
         ]
+        if error:
+            output['dN_dy'][name]['Yerr'][num] = [
+                i.std()/np.sqrt(i.size)
+                for i in split_cent_bins(data, nch_pt_cent_bins)
+            ]
 
     for name, data in mean_pT.items():
         output['mean_pT'][name]['Y'][num] = [
@@ -73,6 +83,11 @@ def compute_observables(input, output, num):
                 split_cent_bins(dN_dy[name], nch_pt_cent_bins)
             )
         ]
+        if error:
+            output['mean_pT'][name]['Yerr'][num] = [
+                i.std()/np.sqrt(i.size)
+                for i in split_cent_bins(data, nch_pt_cent_bins)
+            ]
 
     # flow cumulants
     M, Qn = (np.array(input['flow'][i])[order] for i in ['M', 'Qn'])
@@ -89,6 +104,11 @@ def compute_observables(input, output, num):
         output['vn'][str(n)]['Y'][num] = [
             c.flow(n, 2, imaginary='zero') for c in cumulants
         ]
+        if error:
+            output['vn'][str(n)]['Yerr'][num] = [
+                c.flow(n, 2, error=True, imaginary='zero')[1]
+                for c in cumulants
+            ]
 
 
 def main():
@@ -101,6 +121,8 @@ def main():
     parser.add_argument('--pattern', default=r'\b[0-9]{3}\b',
                         help='regular expression pattern for extracting \
                               batch names from filenames')
+    parser.add_argument('--error', action='store_true',
+                        help='whether to compute statistical errors')
 
     parser.add_argument('input_files', nargs='+',
                         help='HDF5 event observable files')
@@ -127,12 +149,17 @@ def main():
 
         f.create_dataset('dNch_deta/Y', **empty_kwargs)
 
+        if args.error:
+            f.create_dataset('dNch_deta/Yerr', **empty_kwargs)
+
         for obs in ['dN_dy', 'mean_pT']:
             g = f.create_group(obs)
             for name in ['pion', 'kaon', 'proton']:
                 h = g.create_group(name)
                 h['x'] = f['dNch_deta/x']
                 h.create_dataset('Y', **empty_kwargs)
+                if args.error:
+                    h.create_dataset('Yerr', **empty_kwargs)
 
         empty_kwargs['shape'] = (nbatches, len(flow_cent_bins) - 1)
 
@@ -145,11 +172,13 @@ def main():
                 g['x'] = f['vn/2/x']
 
             g.create_dataset('Y', **empty_kwargs)
+            if args.error:
+                g.create_dataset('Yerr', **empty_kwargs)
 
         for n, infile in enumerate(input_files):
             print(n, infile)
             with h5py.File(infile, 'r') as i:
-                compute_observables(i, f, n)
+                compute_observables(i, f, n, error=args.error)
 
 
 if __name__ == "__main__":
