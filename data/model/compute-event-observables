@@ -82,7 +82,13 @@ def compute_observables(event):
         np.exp(np.outer(1j*Qn_to_compute, phi)).sum(axis=1)
     )
 
-    return ic_data, dNch_deta, ID_parts_data, flow_data
+    atlas_phi = particle_data['phi'][charged & (abs_eta < 2.5) & (pT > 0.5)]
+    atlas_flow_data = (
+        atlas_phi.size,
+        np.exp(np.outer(1j*Qn_to_compute, atlas_phi)).sum(axis=1)
+    )
+
+    return ic_data, dNch_deta, ID_parts_data, flow_data, atlas_flow_data
 
 
 def write_observables(events, h5_file):
@@ -94,7 +100,7 @@ def write_observables(events, h5_file):
         *path, data = args
         h5_file.create_dataset('/'.join(path), data=data, compression='lzf')
 
-    ic_data, dNch_deta, ID_parts_data, flow_data = zip(
+    ic_data, dNch_deta, ID_parts_data, flow_data, atlas_flow_data = zip(
         *(compute_observables(e) for e in events)
     )
 
@@ -112,6 +118,9 @@ def write_observables(events, h5_file):
 
     for name, data in zip(['M', 'Qn'], zip(*flow_data)):
         write_dataset('flow', name, data)
+
+    for name, data in zip(['M', 'Qn'], zip(*atlas_flow_data)):
+        write_dataset('atlas_flow', name, data)
 
 
 def get_h5_groups(h5_filename, verbose=False):
