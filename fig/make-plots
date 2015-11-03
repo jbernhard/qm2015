@@ -674,6 +674,48 @@ def pca(batch_obs, **kwargs):
 
 
 @plot
+def pca_variance(batch_obs, exp_data, **kwargs):
+    observables = [
+        ('dN_dy/pion',     8),
+        ('dN_dy/kaon',     8),
+        ('dN_dy/proton',   8),
+        ('mean_pT/pion',   8),
+        ('mean_pT/kaon',   8),
+        ('mean_pT/proton', 8),
+        ('vn/2',           8),
+        ('vn/3',           6),
+        ('vn/4',           6),
+    ]
+
+    with h5py.File(batch_obs, 'r') as f:
+        model = np.hstack([f[k]['Y'][:, :n] for k, n in observables])
+
+    with h5py.File(exp_data, 'r') as f:
+        exp = np.hstack([f[k]['y'][:n] for k, n in observables])
+
+    pca = mtd.PCA(model/exp)
+    npc = 8
+
+    fig = plt.figure(figsize=(8, 5))
+    ax = fig.gca()
+
+    ax.plot(np.arange(npc) + 1, pca.weights[:npc].cumsum(), '-o',
+            ms=8, mfc=plt.cm.Blues(0.75), mew=0.8, mec='white',
+            color=plt.cm.Blues(0.5))
+    ax.axhline(1, color='0.7', zorder=-10)
+
+    ax.set_xlim(0.75, npc + 0.25)
+    ax.set_ylim(0.7, 1.01)
+
+    ax.set_yticks(np.arange(7, 11)/10)
+
+    ax.set_xlabel('Number of PC', labelpad=10)
+    ax.set_ylabel('Explained variance', labelpad=10)
+
+    finish(remove_ticks=True)
+
+
+@plot
 def validation(calibration, batch_obs_validation, **kwargs):
     observables = [
         ('dN_dy/pion', r'$dN_{\pi^\pm}/dy$', (0, 3200)),
