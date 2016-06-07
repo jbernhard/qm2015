@@ -66,6 +66,7 @@
 \usepackage{booktabs}
 \usepackage{setspace}
 \usepackage{tikz}
+\usetikzlibrary{positioning}
 
 \newcommand{\avg}[1]{\langle #1 \rangle}
 \newcommand{\nch}{N_\text{ch}}
@@ -91,7 +92,7 @@
 \author[J.\ E.\ Bernhard, S.\ A.\ Bass]{Jonah E.\ Bernhard, Steffen A.\ Bass}
 \institute[Duke]{Duke University}
 \date{Wednesday, June 15, 2016}
-\titlegraphic{\includegraphics[scale=2.3]{posterior}}
+\titlegraphic{\includegraphics[scale=2.3]{posterior_pair}}
 
 
 \begin{document}
@@ -107,7 +108,7 @@
   \end{tikzpicture}
   \centering
   \setstretch{1.35}
-  {\color{theme}{\large\inserttitle}\\[1ex]\insertsubtitle} \\[2ex]
+  {\color{theme}{\Large\inserttitle}\\[1ex]\large\insertsubtitle} \\[2ex]
   \small
   \insertauthor \\[2ex]
   \scriptsize
@@ -133,16 +134,85 @@
   \end{itemize}
 \end{frame}
 
+\begin{frame}{\trento\ initial condition model}
+  \vspace{1em}
+  \includegraphics{trento_events}
+\end{frame}
+
+\begin{frame}{Experiment design}
+  \centering
+  \includegraphics{design}
+\end{frame}
+
+\begin{frame}{Training data}
+  \begin{tikzpicture}[remember picture, overlay]
+    \node[yshift=-1em] at (current page.center) {
+      \includegraphics{observables_prior}
+    };
+    \node[above left=1em of current page.center, text width=.5\textwidth] {
+      \begin{itemize}
+        \item Model calculations at each design point
+        \item To be used as training data for emulator
+      \end{itemize}
+    };
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Gaussian process emulator}
+  \includegraphics{gp}
+\end{frame}
+
+\begin{frame}{Multivariate output}
+  \includegraphics{pca}
+  \includegraphics{pca_variance}
+\end{frame}
+
+\begin{frame}{Validation}
+  \includegraphics{validation}
+\end{frame}
+
+\begin{frame}{MCMC}
+
+\end{frame}
+
 
 \section{Results}
 
-\begin{frame}{Title}
-  hello
-\end{frame}
-
 \begin{frame}[plain]
   \centering
-  \includegraphics{posterior}
+  \includegraphics<1>{posterior_lower}
+  \includegraphics<2>{posterior_pair}
+\end{frame}
+
+\begin{frame}{Estimate of $(\eta/s)(T)$}
+  \centering
+  \includegraphics{etas_estimate}
+\end{frame}
+
+\begin{frame}{Posterior samples}
+  \begin{tikzpicture}[remember picture, overlay]
+    \node[yshift=-1em] at (current page.center) {
+      \includegraphics<1>{observables_prior}
+      \includegraphics<2>{observables_posterior}
+    };
+    \node[
+      below right=2em of current page.north west, inner ysep=3.5em,
+      text width=.5\textwidth, align=center
+    ] {
+      Model calculations at each design point \\
+      \only<2->{
+        $\downarrow$ \\
+        Emulator predictions from calibrated posterior
+      }
+    };
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Most probable parameters}
+  \makebox[\textwidth]{
+    \includegraphics<1>{mode_observables_id}
+    \includegraphics<2>{mode_observables_both}
+  }
 \end{frame}
 
 
