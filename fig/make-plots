@@ -10,6 +10,7 @@ import husl
 import george
 import mtd
 import matplotlib.pyplot as plt
+from matplotlib import patches
 from matplotlib import ticker
 from matplotlib.colors import LinearSegmentedColormap
 
@@ -408,7 +409,7 @@ def observables_posterior(calibration, exp_data, **kwargs):
 
 @plot
 def etas_estimate(calibration, **kwargs):
-    plt.figure(figsize=(.7*textwidth, .7*aspect*textwidth))
+    plt.figure(figsize=(.75*textwidth, .75*aspect*textwidth))
     ax = plt.axes()
 
     T = np.linspace(.154, .3, 50)
@@ -450,6 +451,152 @@ def etas_estimate(calibration, **kwargs):
     ]), loc='upper left')
 
     finish()
+
+
+@plot
+def posterior_p_arrows(calibration, n=1, **kwargs):
+    with h5py.File(calibration, 'r') as f:
+        chain = f['chain'][:, n]
+
+    fig = plt.figure(figsize=(.65*textwidth, .25*textwidth))
+    ax = fig.gca()
+
+    counts, edges = np.histogram(chain, bins=100)
+    x = (edges[1:] + edges[:-1]) / 2
+    y = counts / counts.max()
+    ax.plot(x, y, color=plt.cm.Blues(0.8))
+    ax.fill_between(x, y, color=plt.cm.Blues(0.15), zorder=-10)
+
+    ax.set_xlabel('$p$')
+
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    for label, x, err in [
+            ('KLN', -.67, .01),
+            ('EKRT /\nIP-Glasma', 0, .1),
+            ('Wounded\nnucleon', 1, None),
+    ]:
+        args = ([x], [0], 'o') if err is None else ([x - err, x + err], [0, 0])
+        ax.plot(*args, lw=4, ms=4, color=offblack, alpha=.58, clip_on=False)
+
+        if label.startswith('EKRT'):
+            x -= .04
+
+        ax.text(x, .05, label, va='bottom', ha='center')
+
+    ax.set_xticks(np.arange(-10, 11, 5)/10)
+    ax.set_xticks(np.arange(-75, 76, 50)/100, minor=True)
+
+    for t in ax.get_xticklabels():
+        t.set_y(-.03)
+
+    xm = 1.2
+    ax.set_xlim(-xm, xm)
+    ax.add_artist(
+        patches.FancyArrowPatch(
+            (-xm, 0), (xm, 0),
+            linewidth=.6,
+            arrowstyle=patches.ArrowStyle.CurveFilledAB(
+                head_length=3, head_width=1.5
+            ),
+            facecolor=offblack, edgecolor=offblack,
+            clip_on=False, zorder=100
+        )
+    )
+
+    ax.set_yticks([])
+    ax.set_ylim(0, 1.01*y.max())
+
+    finish(pad=0, despine=False)
+
+
+@plot
+def trento_ecc_compare(**kwargs):
+    plots = [
+        ('KLN', -.5, np.array([
+            0.0643916913946587,
+            0.06884272997032634,
+            0.08961424332344212,
+            0.13115727002967356,
+            0.18605341246290802,
+            0.2439169139465875,
+            0.30326409495548967,
+            0.36409495548961424,
+            0.4189910979228487,
+            0.47240356083086066,
+            0.5213649851632048,
+            0.5688427299703265,
+            0.6118694362017802,
+            0.537685459940653,
+        ])),
+        ('IP-Glasma', .3, np.array([
+            0.09258160237388721,
+            0.10148367952522253,
+            0.1014836795252225,
+            0.12967359050445101,
+            0.16676557863501484,
+            0.20682492581602369,
+            0.26172106824925817,
+            0.30919881305637975,
+            0.35816023738872405,
+            0.4130563798219584,
+            0.4590504451038575,
+            0.4991097922848665,
+            0.556973293768546,
+            0.5762611275964391,
+        ])),
+        ('Wounded nucleon', 1., np.array([
+            0.06383647798742145,
+            0.07012578616352205,
+            0.07641509433962262,
+            0.09842767295597488,
+            0.1283018867924529,
+            0.16761006289308172,
+            0.21949685534591196,
+            0.2572327044025158,
+            0.31855345911949695,
+            0.36415094339622645,
+            0.4160377358490567,
+            0.47735849056603774,
+            0.5465408805031446,
+            0.5308176100628931,
+        ])),
+    ]
+
+    plt.style.use('seaborn-deep')
+
+    plt.figure(figsize=(.5*textwidth, .35*textwidth))
+    ax = plt.axes()
+
+    b = np.arange(14)
+
+    def trento_e2(b, p):
+        nev = 1000 + b*100
+        with subprocess.Popen(
+                ('trento Au Au {0} -x 4.2 -w .4 -k 1.3 '
+                 '--grid-max 9 --grid-step .3 '
+                 '--b-min {1} --b-max {1} -p {2}').format(nev, b, p).split(),
+                stdout=subprocess.PIPE
+        ) as proc:
+            e2 = np.array([l.split()[4] for l in proc.stdout], dtype=float)
+
+        return e2.mean()
+
+    for model, p, e2 in plots:
+        ax.plot(b, [trento_e2(b_, p) for b_ in b], color='.2')
+        ax.plot(b, e2, 'o', label=model)
+
+    ax.set_xlabel(r'Impact parameter $b$ [fm]')
+    ax.set_ylabel(r'Ellipticity $\varepsilon_2$')
+
+    ax.set_ylim(0, .65)
+
+    ax.set_yticks(np.linspace(0, .6, 4))
+
+    ax.legend(loc='upper left', handletextpad=0, bbox_to_anchor=(-.03, 1.03))
+
+    finish(pad=0)
 
 
 def _mode_observables(batch_obs_mode, batch_obs_mode_nch, exp_data, nch=False):
@@ -520,7 +667,7 @@ def _mode_observables(batch_obs_mode, batch_obs_mode_nch, exp_data, nch=False):
                     zorder=1000
                 )
 
-                ax.text(x[-1] + 3, y[-1], label, ha='left', va='center',
+                ax.text(x[-1] + 3, yexp[-1], label, ha='left', va='center',
                         size=fontnormal)
 
             ax.set_ylim(ylim)
@@ -606,7 +753,7 @@ def design(design, **kwargs):
 
 @plot
 def pca(batch_obs, **kwargs):
-    fig = plt.figure(figsize=(.5*textwidth, .5*textwidth))
+    fig = plt.figure(figsize=(.45*textwidth, .45*textwidth))
     ratio = 5
     gs = plt.GridSpec(ratio + 1, ratio + 1)
 
@@ -703,7 +850,7 @@ def pca_variance(batch_obs, exp_data, **kwargs):
     pca = mtd.PCA(model/exp)
     npc = 8
 
-    fig = plt.figure(figsize=(.5*textwidth, .5*aspect*textwidth))
+    fig = plt.figure(figsize=(.45*textwidth, .45*aspect*textwidth))
     ax = fig.gca()
 
     ax.plot(np.arange(npc) + 1, pca.weights[:npc].cumsum(), '-o',

@@ -1,3 +1,4 @@
 *.hdf
 *.pdf
 build/
+!fig/expdata/*.pdf
