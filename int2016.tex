@@ -523,41 +523,29 @@
   \end{tikzpicture}
 \end{frame}
 
-\begin{frame}[plain]
+\begin{frame}<1>[label=posterior, plain]
   \centering
   \smallskip
-  \includegraphics<1>{posterior_lower}
-  \includegraphics<2>{posterior_pair}
+  \includegraphics<1-3>{posterior_lower}
+  \includegraphics<4>{posterior_pair}
   \begin{tikzpicture}[remember picture, overlay]
-    \node<1>[below left=1.5em and 3em of current page.north east, color=theme, font=\Large]
+    \node<1-3>[below left=1.5em and 3em of current page.north east, color=theme, font=\Large]
     (title) {
       Posterior distribution
     };
-    \node<1>[below of=title, font=\small, align=left] {
+    \node<1-3>[below of=title, font=\small, align=left] {
       Estimated values: medians \\
       Uncertainties: 90\% credible intervals
     };
-    \node<2>[color={rgb:red,94;green,165;blue,208}, rotate=90, yshift=-2em, font=\Large]
+    \node<4>[color={rgb:red,94;green,165;blue,208}, rotate=90, yshift=-2em, font=\Large]
     at (current page.west) {
       Identified particles
     };
-    \node<2>[color={rgb:red,218;green,86;blue,78}, rotate=-90, yshift=-2em, font=\Large]
+    \node<4>[color={rgb:red,218;green,86;blue,78}, rotate=-90, yshift=-2em, font=\Large]
     at (current page.east) {
       Charged particles
     };
   \end{tikzpicture}
-\end{frame}
-
-\begin{frame}{Estimate of $(\eta/s)(T)$}
-  \begin{center}
-    \includegraphics{etas_estimate}
-  \end{center}
-  % \centering
-  % \includegraphics{etas_estimate} \\[1em]
-  \begin{itemize}
-    \item First systematic, quantitative estimate of $T$-dependent $\eta/s$
-    \item ``Handle'' near 200 MeV $\rightarrow$ need multiple beam energies!
-  \end{itemize}
 \end{frame}
 
 \begin{frame}{Constraining initial conditions}
@@ -578,8 +566,21 @@
     \item Entropy deposition approx.\ proportional to geometric mean of nuclear density: $s \sim \sqrt{T_A T_B}$
     \item Confirms success / failure of existing models
   \end{itemize}
-
 \end{frame}
+
+\againframe<2>[plain, noframenumbering]{posterior}
+
+\begin{frame}{Estimate of $(\eta/s)(T)$}
+  \begin{center}
+    \includegraphics{etas_estimate}
+  \end{center}
+  \begin{itemize}
+    \item First systematic, quantitative estimate of $T$-dependent $\eta/s$
+    \item ``Handle'' near 200 MeV $\rightarrow$ need multiple beam energies!
+  \end{itemize}
+\end{frame}
+
+\againframe<3-4>[plain, noframenumbering]{posterior}
 
 \begin{frame}{Most probable parameters}
   \begin{center}
