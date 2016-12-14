@@ -88,15 +88,11 @@
 
 \newcommand{\arxivnum}{1605.03954}
 \newcommand{\arxivclass}{nucl-th}
-\newcommand{\conference}{INT workshop: Bayesian methods in nuclear physics}
-\title
-[Precision extraction of QGP properties (\arxivnum)]
-{Precision extraction of QGP properties \\ with quantified uncertainties}
-\subtitle{Part II: methodology and results}
-\author[J.\ E.\ Bernhard, S.\ A.\ Bass]{Jonah E.\ Bernhard, Steffen A.\ Bass}
+\newcommand{\conference}{IML Machine Learning Working Group Meeting}
+\title{Applying Bayesian parameter estimation to relativistic heavy-ion collisions}
+\author[J.\ E.\ Bernhard]{Jonah E.\ Bernhard}
 \institute[Duke]{Duke University}
-\date{Wednesday, June 15, 2016}
-\titlegraphic{\includegraphics[scale=2.3]{posterior_pair}}
+\date{Thursday 15 December 2016}
 
 
 \begin{document}
@@ -106,15 +102,18 @@
 
 \begin{frame}[plain,noframenumbering]
   \begin{tikzpicture}[remember picture, overlay]
-    \node at (current page.center) {\inserttitlegraphic};
-    \fill[white, opacity=.9] (current page.north west) rectangle (current page.south east);
-    \node[anchor=south east] at (current page.south east) {\scriptsize arXiv:\arxivnum\ [\arxivclass]};
+    \node[anchor=south east] at (current page.south east) {\scriptsize
+      \href{https://journals.aps.org/prc/abstract/10.1103/PhysRevC.94.024907}{PRC 94, 024907 (2016)}
+      \quad
+      \href{https://arxiv.org/abs/\arxivnum}{arXiv:\arxivnum\ [\arxivclass]}
+    };
   \end{tikzpicture}
   \centering
   \setstretch{1.35}
-  {\color{theme}{\Large\inserttitle}\\[1ex]\large\insertsubtitle} \\[2ex]
+  {\color{theme}\Large\inserttitle} \\[2ex]
   \small
-  \insertauthor \\[2ex]
+  \insertauthor \\
+  (\insertinstitute) \\[2ex]
   \scriptsize
   \conference \\
   \insertdate
