@@ -421,27 +421,6 @@
   \end{columns}
 \end{frame}
 
-\begin{frame}{Multivariate output}
-  \begin{columns}
-    \column{.55\textwidth}
-    Many highly correlated outputs \\
-    $\rightarrow$ \textbf{principal component analysis} \\[1em]
-    PCs = eigenvectors of sample covariance matrix
-    \begin{equation*}
-      Y\tran Y = U \Lambda U\tran
-    \end{equation*}
-    Transform data into orthogonal, uncorrelated linear combinations
-    \begin{equation*}
-      Z = \sqrt m \, YU
-    \end{equation*}
-    Emulate each PC independently
-    \column{.45\textwidth}
-    \includegraphics<1>{pca}
-    \only<2>{\hspace{3em}68 outputs $\rightarrow$ 8 PCs \\[1em]}
-    \includegraphics<2>{pca_variance}
-  \end{columns}
-\end{frame}
-
 \begin{frame}{Validation}
   \begin{center}
     Independent 50-point validation design \\[1em]
@@ -658,6 +637,27 @@
     \boldsymbol\mu &= \sigma(X_*, X)\sigma(X, X)^{-1}\y, \\
     \Sigma &= \sigma(X_*,X_*) - \sigma(X_*,X)\sigma(X,X)^{-1}\sigma(X,X_*).
   \end{align*}
+\end{frame}
+
+\begin{frame}{Multivariate output}
+  \begin{columns}
+    \column{.55\textwidth}
+    Many highly correlated outputs \\
+    $\rightarrow$ \textbf{principal component analysis} \\[1em]
+    PCs = eigenvectors of sample covariance matrix
+    \begin{equation*}
+      Y\tran Y = U \Lambda U\tran
+    \end{equation*}
+    Transform data into orthogonal, uncorrelated linear combinations
+    \begin{equation*}
+      Z = \sqrt m \, YU
+    \end{equation*}
+    Emulate each PC independently
+    \column{.45\textwidth}
+    \includegraphics<1>{pca}
+    \only<2>{\hspace{3em}68 outputs $\rightarrow$ 8 PCs \\[1em]}
+    \includegraphics<2>{pca_variance}
+  \end{columns}
 \end{frame}
 
 
